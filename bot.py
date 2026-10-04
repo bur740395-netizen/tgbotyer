@@ -10,7 +10,7 @@ from playwright.async_api import async_playwright
 TOKEN = "8925788497:AAH7Kg8QB7gRWrXgtgvC0fBCvzUePgkFZjc"
 
 # 2. BASE DE DATOS DE CLIENTES (Optimizado como set para soportar 100-200+ usuarios con cero retraso)
-IDS_PERMITIDOS = {7076121810, 987654321} # Añade más IDs separados por comas aquí
+IDS_PERMITIDOS = {7076121810, 1648637276} # Añade más IDs separados por comas aquí
 
 # Servidor Flask para atender los pings de Render / cron-job.org
 app_flask = Flask(__name__)
