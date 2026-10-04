@@ -1,7 +1,6 @@
 import asyncio
 import re
-import os
-from threading import Thread
+import threading
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -10,19 +9,44 @@ from playwright.async_api import async_playwright
 # 1. TUS CREDENCIALES
 TOKEN = "8925788497:AAH7Kg8QB7gRWrXgtgvC0fBCvzUePgkFZjc"
 
-# 2. BASE DE DATOS DE CLIENTES
-IDS_PERMITIDOS = [7076121810, 987654321] # Pon tu ID aquí para probar
+# 2. BASE DE DATOS DE CLIENTES (Optimizado como set para soportar 100-200+ usuarios con cero retraso)
+IDS_PERMITIDOS = {7076121810, 987654321} # Añade más IDs separados por comas aquí
+
+# Servidor Flask para atender los pings de Render / cron-job.org
+app_flask = Flask(__name__)
+
+@app_flask.route('/ping')
+def ping():
+    return "Bot activo y funcionando"
+
+def run_flask():
+    app_flask.run(host="0.0.0.0", port=10000)
 
 async def extraer_codigo_web(correo_cliente: str) -> str:
     async with async_playwright() as p:
-        # IMPORTANTE EN LA NUBE: headless=True para que corra en el servidor sin interfaz visual
-        browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+        # Optimizaciones extremas de Playwright para ahorrar RAM en contenedores
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-software-rasterizer"
+            ]
+        )
         context = await browser.new_context()
         page = await context.new_page()
 
+        # Bloquear recursos innecesarios (imágenes, CSS, fuentes, medios) para gastar menos memoria
+        await page.route(
+            "**/*", 
+            lambda route: route.abort() if route.request.resource_type in ["image", "stylesheet", "font", "media"] else route.continue_()
+        )
+
         try:
             # PASO 1: Ingresar a la web
-            await page.goto("https://clientes.kingg.app/portal/login")
+            await page.goto("https://clientes.kingg.app/portal/login", timeout=60000)
 
             # PASO 2: Login
             await page.get_by_placeholder("Tu usuario").fill("yersonmg29")
@@ -54,6 +78,7 @@ async def extraer_codigo_web(correo_cliente: str) -> str:
             await page.wait_for_timeout(20000) 
             
             texto_pantalla = await page.locator("body").inner_text()
+            
             busqueda = re.search(r'\b\d{3}\s?\d{3}\b', texto_pantalla)
             
             if busqueda:
@@ -66,6 +91,7 @@ async def extraer_codigo_web(correo_cliente: str) -> str:
             return f"❌ Error al navegar por la página: {error}"
             
         finally:
+            await context.close()
             await browser.close()
 
 async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,27 +111,15 @@ async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except IndexError:
         await update.message.reply_text("⚠️ Formato incorrecto. Por favor envía:\n/max correo@cuenta.com")
 
-# Servidor Flask para atender los pings y mantener despierto a Render
-app_flask = Flask(__name__)
-
-@app_flask.route('/ping')
-def ping():
-    return "Bot activo y funcionando", 200
-
-def run_flask():
-    port = int(os.environ.get("PORT", 3000))
-    app_flask.run(host="0.0.0.0", port=port)
-
 def main():
-    # Iniciar servidor Flask en un hilo paralelo
-    t = Thread(target=run_flask)
-    t.daemon = True
-    t.start()
+    # Iniciar Flask en segundo plano para el servidor web y los pings de mantenimiento
+    hilo_flask = threading.Thread(target=run_flask, daemon=True)
+    hilo_flask.start()
 
     # Iniciar bot de Telegram
     app = Application.builder().token(TOKEN).connect_timeout(30).read_timeout(30).build()
     app.add_handler(CommandHandler("max", comando_max))
-    print("🤖 Bot en línea en la nube. Esperando comandos...")
+    print("🤖 Bot y servidor Flask en línea. Esperando comandos...")
     app.run_polling()
 
 if __name__ == "__main__":
