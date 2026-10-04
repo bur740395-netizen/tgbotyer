@@ -38,12 +38,11 @@ async def extraer_codigo_web(correo_cliente: str) -> str:
         context = await browser.new_context()
         page = await context.new_page()
 
-        # Bloquear recursos innecesarios (imágenes, CSS, fuentes, medios) para gastar menos memoria
+       # Permitir CSS para que la web cargue bien, bloqueando solo imágenes, fuentes y medios pesados
         await page.route(
-            "**/*", 
-            lambda route: route.abort() if route.request.resource_type in ["image", "stylesheet", "font", "media"] else route.continue_()
+        "**/*", 
+        lambda route: route.abort() if route.request.resource_type in ["image", "font", "media"] else route.continue_()
         )
-
         try:
             # PASO 1: Ingresar a la web
             await page.goto("https://clientes.kingg.app/portal/login", timeout=60000)
