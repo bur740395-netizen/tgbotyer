@@ -1,3 +1,4 @@
+import os
 import asyncio
 import re
 import threading
@@ -7,7 +8,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from playwright.async_api import async_playwright
 
 # 1. TUS CREDENCIALES
-TOKEN = "8925788497:AAH7Kg8QB7gRWrXgtgvC0fBCvzUePgkFZjc"
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # 2. BASE DE DATOS DE CLIENTES (Optimizado como set para soportar 100-200+ usuarios con cero retraso)
 IDS_PERMITIDOS = {7076121810, 1648637276} # Añade más IDs separados por comas aquí
