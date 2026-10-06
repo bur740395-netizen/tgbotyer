@@ -30,23 +30,54 @@ html_template = """
         input[type="email"] { width: 90%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
         button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
         .resultado { margin-top: 20px; font-weight: bold; color: #333; padding: 15px; border-radius: 5px; background-color: #e9ecef; word-break: break-all; }
+        
+        /* Estilos para la animación de carga */
+        #cargando { display: none; margin-top: 20px; font-size: 15px; color: #555; font-weight: bold; }
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="contenedor">
         <h2>Consultar Código Max</h2>
-        <form method="POST">
+        <form method="POST" onsubmit="mostrarCarga()">
             <input type="email" name="correo" placeholder="Ingresa el correo de la cuenta" required>
             <br>
-            <button type="submit">Consultar Código</button>
+            <button type="submit" id="btn-consultar">Consultar Código</button>
         </form>
+        
+        <!-- Pantalla de carga (Oculta por defecto) -->
+        <div id="cargando">
+            <div class="spinner"></div>
+            <p>⏳ Esperar aprox. 1 minuto, obteniendo código...</p>
+        </div>
+
         {% if resultado %}
-            <div class="resultado">
+            <div class="resultado" id="resultado-final">
                 <p>{{ resultado }}</p>
             </div>
         {% endif %}
     </div>
+
+    <!-- Script para controlar el botón y la carga -->
+    <script>
+        function mostrarCarga() {
+            // Deshabilitar el botón y cambiar su texto
+            document.getElementById('btn-consultar').disabled = true;
+            document.getElementById('btn-consultar').innerText = "Procesando...";
+            
+            // Mostrar la animación y texto de carga
+            document.getElementById('cargando').style.display = 'block';
+            
+            // Ocultar el resultado del correo anterior si el usuario hace una nueva consulta
+            var resultadoPrevio = document.getElementById('resultado-final');
+            if (resultadoPrevio) {
+                resultadoPrevio.style.display = 'none';
+            }
+        }
+    </script>
 </body>
 </html>
 """
