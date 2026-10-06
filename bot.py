@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # 2. BASE DE DATOS DE CLIENTES (Optimizado como set para soportar 100-200+ usuarios con cero retraso)
-IDS_PERMITIDOS = {7076121810, 1648637276} # Añade más IDs separados por comas aquí
+IDS_PERMITIDOS = {7076121810, 1648637276, 7981030060} # Añade más IDs separados por comas aquí
 
 # Servidor Flask para atender los pings de Render / cron-job.org
 app_flask = Flask(__name__)
