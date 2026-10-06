@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # 2. BASE DE DATOS DE CLIENTES
-IDS_PERMITIDOS = {7076121810, 1648637276, 7981030060}
+IDS_PERMITIDOS = {7076121810, 1648637276}
 
 # Servidor Flask para la web y los pings
 app_flask = Flask(__name__)
