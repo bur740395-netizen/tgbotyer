@@ -26,7 +26,40 @@ html_template = """
     <title>Consultas Max</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .contenedor { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; }
+        
+        /* Estilos del banner de publicidad superior */
+        .banner-promo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            text-align: center;
+            padding: 15px 0;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff, 0 0 30px #ffffff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            z-index: 1000;
+            line-height: 1.4;
+        }
+        
+        /* Ocultar el formato de enlace por defecto para mantener el efecto neón */
+        .banner-promo a {
+            color: inherit;
+            text-decoration: none;
+        }
+        
+        .banner-promo span {
+            font-size: 28px;
+            display: block;
+            cursor: pointer;
+        }
+
+        /* Contenedor principal */
+        .contenedor { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; margin-top: 60px; }
         input[type="email"] { width: 90%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
         button:hover { background-color: #0056b3; }
@@ -40,6 +73,14 @@ html_template = """
     </style>
 </head>
 <body>
+    <!-- BANNER PUBLICITARIO LLAMATIVO CON ENLACE A WHATSAPP -->
+    <div class="banner-promo">
+        PROMOCIONES Y VENTAS:
+        <a href="https://wa.me/51931877274" target="_blank">
+            <span>+51 931 877 274</span>
+        </a>
+    </div>
+
     <div class="contenedor">
         <h2>Consultar Código Max</h2>
         <form method="POST" onsubmit="mostrarCarga()">
