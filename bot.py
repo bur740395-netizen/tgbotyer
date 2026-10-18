@@ -1,4 +1,5 @@
 import os
+import gc
 import asyncio
 import re
 import threading
@@ -12,6 +13,9 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # 2. BASE DE DATOS DE CLIENTES
 IDS_PERMITIDOS = {7076121810, 1648637276}
+
+# Candado global para evitar que 2 navegadores se abran al mismo segundo y saturen los 512 MB de RAM
+navegador_lock = threading.Lock()
 
 # Servidor Flask para la web y los pings
 app_flask = Flask(__name__)
@@ -46,7 +50,6 @@ html_template = """
             line-height: 1.4;
         }
         
-        /* Ocultar el formato de enlace por defecto para mantener el efecto neón */
         .banner-promo a {
             color: inherit;
             text-decoration: none;
@@ -102,17 +105,12 @@ html_template = """
         {% endif %}
     </div>
 
-    <!-- Script para controlar el botón y la carga -->
     <script>
         function mostrarCarga() {
-            // Deshabilitar el botón y cambiar su texto
             document.getElementById('btn-consultar').disabled = true;
             document.getElementById('btn-consultar').innerText = "Procesando...";
-            
-            // Mostrar la animación y texto de carga
             document.getElementById('cargando').style.display = 'block';
             
-            // Ocultar el resultado del correo anterior si el usuario hace una nueva consulta
             var resultadoPrevio = document.getElementById('resultado-final');
             if (resultadoPrevio) {
                 resultadoPrevio.style.display = 'none';
@@ -128,15 +126,15 @@ html_template = """
 def index():
     resultado = None
     if request.method == 'POST':
-        correo = request.form.get('correo')
+        correo = request.form.get('correo', '').strip()
         try:
-            # Crea un nuevo ciclo asíncrono para ejecutar Playwright desde la ruta web
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            resultado = loop.run_until_complete(extraer_codigo_web(correo))
-            loop.close()
+            # El candado asegura que si hay otra consulta en curso, espere su turno sin duplicar la RAM
+            with navegador_lock:
+                resultado = asyncio.run(extraer_codigo_web(correo))
         except Exception as e:
             resultado = f"Error al procesar: {e}"
+        finally:
+            gc.collect()  # Limpiar memoria RAM inmediatamente
             
     return render_template_string(html_template, resultado=resultado)
 
@@ -145,74 +143,91 @@ def ping():
     return "Bot activo y funcionando"
 
 def run_flask():
-    app_flask.run(host="0.0.0.0", port=10000)
+    # threaded=True pero controlado por nuestro candado y sin recarga en modo debug
+    app_flask.run(host="0.0.0.0", port=10000, debug=False, use_reloader=False)
 
-# --- LÓGICA DE EXTRACCIÓN (CON REINTENTOS) ---
+# --- LÓGICA DE EXTRACCIÓN OPTIMIZADA ---
 async def extraer_codigo_web(correo_cliente: str, max_intentos: int = 3) -> str:
-    for intento in range(1, max_intentos + 1):
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--disable-software-rasterizer"
-                ]
-            )
-            context = await browser.new_context()
-            page = await context.new_page()
-
-            await page.route(
-                "**/*", 
-                lambda route: route.abort() if route.request.resource_type in ["image", "font", "media"] else route.continue_()
-            )
-
-            try:
-                await page.goto("https://clientes.kingg.app/portal/login", timeout=60000)
-                await page.get_by_placeholder("Tu usuario").fill("yersonmg29")
-                await page.get_by_placeholder("Tu contraseña").fill("Yersonmg29cuentas*")
-                await page.get_by_text("Ingresar a mis servicios").click()
+    # Iniciamos Playwright UNA sola vez fuera del bucle de reintentos
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--no-zygote",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--mute-audio",
+                "--js-flags=--max-old-space-size=128"  # Limita la RAM de JavaScript en el navegador
+            ]
+        )
         
-                await page.wait_for_timeout(3000)
-                await page.locator("text=Bots").first.click()
-                await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
+        try:
+            for intento in range(1, max_intentos + 1):
+                context = await browser.new_context()
+                page = await context.new_page()
 
-                await page.get_by_text("Seleccionar plataforma").click()
-                await page.get_by_text("Max Estandar").first.click()
-                await page.get_by_text("MAX", exact=True).first.click()
+                # Bloquear recursos pesados (imágenes, fuentes, multimedia)
+                await page.route(
+                    "**/*", 
+                    lambda route: route.abort() if route.request.resource_type in ["image", "font", "media"] else route.continue_()
+                )
 
-                await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
-                await page.wait_for_timeout(1500)
-                
-                await page.get_by_text(correo_cliente).last.click()
-                await page.get_by_role("button", name="Consultar").click()
+                try:
+                    await page.goto("https://clientes.kingg.app/portal/login", timeout=45000)
+                    await page.get_by_placeholder("Tu usuario").fill("yersonmg29")
+                    await page.get_by_placeholder("Tu contraseña").fill("Yersonmg29cuentas*")
+                    await page.get_by_text("Ingresar a mis servicios").click()
+            
+                    await page.wait_for_timeout(3000)
+                    await page.locator("text=Bots").first.click()
+                    await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
 
-                await page.wait_for_timeout(20000) 
-                texto_pantalla = await page.locator("body").inner_text()
-                
-                busqueda = re.search(r'\b\d{3}\s?\d{3}\b', texto_pantalla)
-                
-                if busqueda:
-                    codigo_encontrado = busqueda.group(0).replace(" ", "")
-                    return f"✅ El código de Max es: {codigo_encontrado}"
-                
-                # Si no encuentra el código pero aún quedan intentos, espera 3 segundos y reintenta
-                if intento < max_intentos:
-                    await asyncio.sleep(3)
-                    continue
-                return "⚠️ Se hizo la consulta pero no se encontró el código en la pantalla tras varios intentos."
+                    await page.get_by_text("Seleccionar plataforma").click()
+                    await page.get_by_text("Max Estandar").first.click()
+                    await page.get_by_text("MAX", exact=True).first.click()
 
-            except Exception as error:
-                if intento < max_intentos:
-                    await asyncio.sleep(3)
-                    continue
-                return f"❌ Error tras {max_intentos} intentos: {error}"
+                    await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
+                    await page.wait_for_timeout(1500)
+                    
+                    await page.get_by_text(correo_cliente).last.click()
+                    await page.get_by_role("button", name="Consultar").click()
+
+                    # Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar el navegador apenas salga el código
+                    await page.wait_for_timeout(4000)
+                    for _ in range(8):
+                        texto_pantalla = await page.locator("body").inner_text()
+                        busqueda = re.search(r'\b\d{3}\s?\d{3}\b', texto_pantalla)
+                        if busqueda:
+                            codigo_encontrado = busqueda.group(0).replace(" ", "")
+                            return f"✅ El código de Max es: {codigo_encontrado}"
+                        await page.wait_for_timeout(2000)
+                    
+                    if intento < max_intentos:
+                        await asyncio.sleep(2)
+                        continue
+                    return "⚠️ Se hizo la consulta pero no se encontró el código en la pantalla tras varios intentos."
+
+                except Exception as error:
+                    if intento < max_intentos:
+                        await asyncio.sleep(2)
+                        continue
+                    return f"❌ Error tras {max_intentos} intentos: {error}"
                 
-            finally:
-                await context.close()
-                await browser.close()
+                finally:
+                    # Cerramos la pestaña y el contexto tras cada intento para no acumular RAM
+                    await page.close()
+                    await context.close()
+        finally:
+            # Cerramos el navegador por completo y liberamos la memoria
+            await browser.close()
+            gc.collect()
 
 # --- LÓGICA DE TELEGRAM ---
 async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -223,14 +238,22 @@ async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        correo = context.args[0]
+        correo = context.args[0].strip()
         await update.message.reply_text(f"🔍 Conectando al sistema para el correo:\n{correo}\nPor favor, espera unos segundos...")
         
-        resultado = await extraer_codigo_web(correo)
+        # Ejecuta en un hilo sincronizado con el candado para no chocar con consultas web
+        loop = asyncio.get_running_loop()
+        def tarea_sincronizada():
+            with navegador_lock:
+                return asyncio.run(extraer_codigo_web(correo))
+                
+        resultado = await loop.run_in_executor(None, tarea_sincronizada)
         await update.message.reply_text(resultado)
         
     except IndexError:
         await update.message.reply_text("⚠️ Formato incorrecto. Por favor envía:\n/max correo@cuenta.com")
+    finally:
+        gc.collect()
 
 def main():
     # Iniciar Flask en segundo plano
