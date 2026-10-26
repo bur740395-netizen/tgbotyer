@@ -27,13 +27,24 @@ html_template = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consultas Max</title>
+    <title>Consultas HBO Max y Prime Video</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #12151c;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 110px 15px 30px 15px;
+            box-sizing: border-box;
+        }
         
         /* Estilos del banner de publicidad superior */
         .banner-promo {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
@@ -45,7 +56,7 @@ html_template = """
             font-weight: 900;
             letter-spacing: 1px;
             text-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff, 0 0 30px #ffffff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
             z-index: 1000;
             line-height: 1.4;
         }
@@ -62,16 +73,154 @@ html_template = """
         }
 
         /* Contenedor principal */
-        .contenedor { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 400px; margin-top: 60px; }
-        input[type="email"] { width: 90%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; }
+        .wrapper {
+            width: 100%;
+            max-width: 440px;
+        }
+
+        /* Estilo de las 2 tarjetas (Prime Video y HBO Max) */
+        .card-opcion {
+            background: rgba(30, 35, 45, 0.92);
+            border: 2px solid #2b3240;
+            border-radius: 14px;
+            padding: 20px 22px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.35);
+        }
+
+        .card-opcion:hover {
+            transform: translateY(-2px);
+            border-color: #4a5568;
+        }
+
+        .card-opcion.activa-prime {
+            border-color: #29b6f6;
+            box-shadow: 0 0 15px rgba(41, 182, 246, 0.35);
+        }
+
+        .card-opcion.activa-max {
+            border-color: #2563eb;
+            box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+        }
+
+        .card-info h3 {
+            margin: 0 0 6px 0;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+        }
+
+        .card-info p {
+            margin: 0;
+            font-size: 14px;
+            color: #b0b8c4;
+        }
+
+        .card-icono {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+            margin-left: 15px;
+        }
+
+        .icono-prime {
+            background-color: #29b6f6;
+            box-shadow: 0 0 10px rgba(41, 182, 246, 0.4);
+        }
+
+        .icono-max {
+            background-color: #1d4ed8;
+            box-shadow: 0 0 10px rgba(29, 78, 216, 0.5);
+        }
+
+        .card-icono svg {
+            width: 28px;
+            height: 28px;
+            fill: none;
+            stroke: #ffffff;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* Caja del formulario que aparece al seleccionar */
+        .contenedor-form {
+            background-color: #1e232d;
+            border: 1px solid #2e3646;
+            padding: 25px;
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .contenedor-form h2 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #ffffff;
+            margin-bottom: 18px;
+        }
+
+        input[type="email"] {
+            width: 100%;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            border: 1px solid #3d4659;
+            background-color: #13171f;
+            color: #ffffff;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+            outline: none;
+        }
+
+        input[type="email"]:focus {
+            border-color: #29b6f6;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
         button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        .resultado { margin-top: 20px; font-weight: bold; color: #333; padding: 15px; border-radius: 5px; background-color: #e9ecef; word-break: break-all; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+
+        .resultado {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #ffffff;
+            padding: 16px;
+            border-radius: 10px;
+            background-color: #262d3b;
+            border: 1px solid #3b4459;
+            word-break: break-word;
+            text-align: center;
+            font-size: 17px;
+        }
         
         /* Estilos para la animación de carga */
-        #cargando { display: none; margin-top: 20px; font-size: 15px; color: #555; font-weight: bold; }
-        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
+        #cargando { display: none; margin-top: 20px; font-size: 15px; color: #cbd5e1; font-weight: bold; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.15); border-left-color: #29b6f6; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -84,18 +233,51 @@ html_template = """
         </a>
     </div>
 
-    <div class="contenedor">
-        <h2>Consultar Código Max</h2>
-        <form method="POST" onsubmit="mostrarCarga()">
-            <input type="email" name="correo" placeholder="Ingresa el correo de la cuenta" required>
-            <br>
-            <button type="submit" id="btn-consultar">Consultar Código</button>
-        </form>
-        
-        <!-- Pantalla de carga (Oculta por defecto) -->
-        <div id="cargando">
-            <div class="spinner"></div>
-            <p>⏳ Esperar aprox. 1 minuto, obteniendo código...</p>
+    <div class="wrapper">
+        <!-- OPCIÓN 1: PRIME VIDEO -->
+        <div class="card-opcion" id="card-prime" onclick="seleccionarPlataforma('prime')">
+            <div class="card-info">
+                <h3>PRIME VIDEO</h3>
+                <p>Inicio de sesión en Amazon Prime Video</p>
+            </div>
+            <div class="card-icono icono-prime">
+                <svg viewBox="0 0 24 24">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <polygon points="12 11 9 15 15 15 12 11" fill="#ffffff"></polygon>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                </svg>
+            </div>
+        </div>
+
+        <!-- OPCIÓN 2: HBO MAX -->
+        <div class="card-opcion" id="card-max" onclick="seleccionarPlataforma('max')">
+            <div class="card-info">
+                <h3>HBO MAX</h3>
+                <p>Recupera acceso único de HBO Max</p>
+            </div>
+            <div class="card-icono icono-max">
+                <svg viewBox="0 0 24 24">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <polygon points="12 11 9 15 15 15 12 11" fill="#ffffff"></polygon>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                </svg>
+            </div>
+        </div>
+
+        <!-- FORMULARIO DESPLEGABLE -->
+        <div class="contenedor-form" id="caja-formulario">
+            <h2 id="titulo-form">Consultar Código</h2>
+            <form method="POST" onsubmit="mostrarCarga()">
+                <input type="hidden" name="plataforma" id="input-plataforma" value="{{ plataforma_actual or 'max' }}">
+                <input type="email" name="correo" placeholder="Ingresa el correo de la cuenta" required>
+                <button type="submit" id="btn-consultar">Consultar Código</button>
+            </form>
+            
+            <!-- Pantalla de carga (Oculta por defecto) -->
+            <div id="cargando">
+                <div class="spinner"></div>
+                <p>⏳ Esperar aprox. 1 minuto, obteniendo código...</p>
+            </div>
         </div>
 
         {% if resultado %}
@@ -106,6 +288,30 @@ html_template = """
     </div>
 
     <script>
+        function seleccionarPlataforma(plat) {
+            const cardPrime = document.getElementById('card-prime');
+            const cardMax = document.getElementById('card-max');
+            const cajaForm = document.getElementById('caja-formulario');
+            const inputPlat = document.getElementById('input-plataforma');
+            const tituloForm = document.getElementById('titulo-form');
+            const btnConsultar = document.getElementById('btn-consultar');
+
+            cardPrime.classList.remove('activa-prime');
+            cardMax.classList.remove('activa-max');
+            cajaForm.style.display = 'block';
+            inputPlat.value = plat;
+
+            if (plat === 'prime') {
+                cardPrime.classList.add('activa-prime');
+                tituloForm.innerText = "Consultar Código Prime Video";
+                btnConsultar.style.backgroundColor = "#0288d1";
+            } else {
+                cardMax.classList.add('activa-max');
+                tituloForm.innerText = "Consultar Código HBO Max";
+                btnConsultar.style.backgroundColor = "#1d4ed8";
+            }
+        }
+
         function mostrarCarga() {
             document.getElementById('btn-consultar').disabled = true;
             document.getElementById('btn-consultar').innerText = "Procesando...";
@@ -116,6 +322,11 @@ html_template = """
                 resultadoPrevio.style.display = 'none';
             }
         }
+
+        // Mantener seleccionada la tarjeta tras enviar una consulta
+        {% if plataforma_actual %}
+            seleccionarPlataforma('{{ plataforma_actual }}');
+        {% endif %}
     </script>
 </body>
 </html>
@@ -125,18 +336,20 @@ html_template = """
 @app_flask.route('/', methods=['GET', 'POST'])
 def index():
     resultado = None
+    plataforma_actual = None
     if request.method == 'POST':
         correo = request.form.get('correo', '').strip()
+        plataforma_actual = request.form.get('plataforma', 'max').strip().lower()
         try:
             # El candado asegura que si hay otra consulta en curso, espere su turno sin duplicar la RAM
             with navegador_lock:
-                resultado = asyncio.run(extraer_codigo_web(correo))
+                resultado = asyncio.run(extraer_codigo_web(correo, plataforma_actual))
         except Exception as e:
             resultado = f"Error al procesar: {e}"
         finally:
             gc.collect()  # Limpiar memoria RAM inmediatamente
             
-    return render_template_string(html_template, resultado=resultado)
+    return render_template_string(html_template, resultado=resultado, plataforma_actual=plataforma_actual)
 
 @app_flask.route('/ping')
 def ping():
@@ -146,8 +359,11 @@ def run_flask():
     # threaded=True pero controlado por nuestro candado y sin recarga en modo debug
     app_flask.run(host="0.0.0.0", port=10000, debug=False, use_reloader=False)
 
-# --- LÓGICA DE EXTRACCIÓN OPTIMIZADA ---
-async def extraer_codigo_web(correo_cliente: str, max_intentos: int = 3) -> str:
+
+# --- LÓGICA DE EXTRACCIÓN OPTIMIZADA (SOPORTA MAX Y PRIME VIDEO) ---
+async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_intentos: int = 3) -> str:
+    nombre_plat = "Prime Video" if plataforma == "prime" else "HBO Max"
+
     # Iniciamos Playwright UNA sola vez fuera del bucle de reintentos
     async with async_playwright() as p:
         browser = await p.chromium.launch(
@@ -189,30 +405,67 @@ async def extraer_codigo_web(correo_cliente: str, max_intentos: int = 3) -> str:
                     await page.locator("text=Bots").first.click()
                     await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
 
+                    # 1. Seleccionar plataforma según la opción elegida (HBO Max o Prime Video)
                     await page.get_by_text("Seleccionar plataforma").click()
-                    await page.get_by_text("Max Estandar").first.click()
-                    await page.get_by_text("MAX", exact=True).first.click()
+                    await page.wait_for_timeout(800)
 
-                    await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
+                    if plataforma == "prime":
+                        # Flujo de tus capturas para Prime Video
+                        await page.get_by_text("Prime Video").first.click()
+                        await page.wait_for_timeout(1000)
+                        
+                        # En Prime Video la acción es "Código de acceso" (suele autoseleccionarse, pero lo aseguramos)
+                        opcion_accion = page.get_by_text("Primero selecciona una plataforma")
+                        if await opcion_accion.is_visible():
+                            await opcion_accion.click()
+                            await page.wait_for_timeout(500)
+                            await page.get_by_text("Código de acceso").last.click()
+                        else:
+                            # Si ya dice "Código de acceso", hacemos clic para confirmar si el menú lo requiere
+                            await page.get_by_text("Código de acceso").first.click()
+                            await page.wait_for_timeout(500)
+                            if await page.get_by_text("Código de acceso").count() > 1:
+                                await page.get_by_text("Código de acceso").last.click()
+                    else:
+                        # Flujo original intacto para HBO Max
+                        await page.get_by_text("Max Estandar").first.click()
+                        await page.get_by_text("MAX", exact=True).first.click()
+
+                    await page.wait_for_timeout(800)
+
+                    # 2. Escribir el correo en la casilla "Escribe el correo de tu cuenta"
+                    input_correo = page.get_by_placeholder("Escribe el correo de tu cuenta")
+                    if await input_correo.is_visible():
+                        await input_correo.fill(correo_cliente)
+                    else:
+                        await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
+                    
                     await page.wait_for_timeout(1500)
                     
+                    # 3. Seleccionar el correo que se despliega abajo y dar clic en Consultar
                     await page.get_by_text(correo_cliente).last.click()
+                    await page.wait_for_timeout(500)
                     await page.get_by_role("button", name="Consultar").click()
 
-                    # Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar el navegador apenas salga el código
+                    # 4. Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar apenas salga el código
                     await page.wait_for_timeout(4000)
                     for _ in range(8):
                         texto_pantalla = await page.locator("body").inner_text()
-                        busqueda = re.search(r'\b\d{3}\s?\d{3}\b', texto_pantalla)
+                        # Recortamos a partir de "MÁS RECIENTE" o "CÓDIGO DE ACCESO" si aparece para mayor precisión
+                        zona_busqueda = texto_pantalla
+                        if "MÁS RECIENTE" in texto_pantalla:
+                            zona_busqueda = texto_pantalla.split("MÁS RECIENTE")[-1]
+
+                        busqueda = re.search(r'\b\d{3}\s+\d{3}\b|\b\d{6}\b', zona_busqueda)
                         if busqueda:
-                            codigo_encontrado = busqueda.group(0).replace(" ", "")
-                            return f"✅ El código de Max es: {codigo_encontrado}"
+                            codigo_encontrado = re.sub(r'\D', '', busqueda.group(0))
+                            return f"✅ El código de {nombre_plat} es: {codigo_encontrado}"
                         await page.wait_for_timeout(2000)
                     
                     if intento < max_intentos:
                         await asyncio.sleep(2)
                         continue
-                    return "⚠️ Se hizo la consulta pero no se encontró el código en la pantalla tras varios intentos."
+                    return f"⚠️ Se hizo la consulta de {nombre_plat} pero no se encontró el código tras varios intentos."
 
                 except Exception as error:
                     if intento < max_intentos:
@@ -229,9 +482,12 @@ async def extraer_codigo_web(correo_cliente: str, max_intentos: int = 3) -> str:
             await browser.close()
             gc.collect()
 
+
 # --- LÓGICA DE TELEGRAM ---
-async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def procesar_comando_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE, plataforma: str):
     user_id = update.effective_user.id
+    nombre_plat = "Prime Video" if plataforma == "prime" else "HBO Max"
+    cmd_ejemplo = "/prime" if plataforma == "prime" else "/max"
     
     if user_id not in IDS_PERMITIDOS:
         await update.message.reply_text("⛔ Acceso denegado. Tu ID no está registrado.")
@@ -239,21 +495,26 @@ async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         correo = context.args[0].strip()
-        await update.message.reply_text(f"🔍 Conectando al sistema para el correo:\n{correo}\nPor favor, espera unos segundos...")
+        await update.message.reply_text(f"🔍 Consultando código de {nombre_plat} para:\n{correo}\nPor favor, espera unos segundos...")
         
-        # Ejecuta en un hilo sincronizado con el candado para no chocar con consultas web
         loop = asyncio.get_running_loop()
         def tarea_sincronizada():
             with navegador_lock:
-                return asyncio.run(extraer_codigo_web(correo))
+                return asyncio.run(extraer_codigo_web(correo, plataforma))
                 
         resultado = await loop.run_in_executor(None, tarea_sincronizada)
         await update.message.reply_text(resultado)
         
     except IndexError:
-        await update.message.reply_text("⚠️ Formato incorrecto. Por favor envía:\n/max correo@cuenta.com")
+        await update.message.reply_text(f"⚠️ Formato incorrecto. Por favor envía:\n{cmd_ejemplo} correo@cuenta.com")
     finally:
         gc.collect()
+
+async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await procesar_comando_telegram(update, context, "max")
+
+async def comando_prime(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await procesar_comando_telegram(update, context, "prime")
 
 def main():
     # Iniciar Flask en segundo plano
@@ -263,7 +524,8 @@ def main():
     # Iniciar bot de Telegram
     app = Application.builder().token(TOKEN).connect_timeout(30).read_timeout(30).build()
     app.add_handler(CommandHandler("max", comando_max))
-    print("🤖 Bot y servidor web Flask en línea. Esperando consultas...")
+    app.add_handler(CommandHandler("prime", comando_prime))
+    print("🤖 Bot (Max + Prime) y servidor web Flask en línea. Esperando consultas...")
     app.run_polling()
 
 if __name__ == "__main__":
