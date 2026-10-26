@@ -238,7 +238,6 @@ html_template = """
         <div class="card-opcion" id="card-prime" onclick="seleccionarPlataforma('prime')">
             <div class="card-info">
                 <h3>PRIME VIDEO</h3>
-                <p>Inicio de sesión en Amazon Prime Video</p>
             </div>
             <div class="card-icono icono-prime">
                 <svg viewBox="0 0 24 24">
@@ -253,7 +252,6 @@ html_template = """
         <div class="card-opcion" id="card-max" onclick="seleccionarPlataforma('max')">
             <div class="card-info">
                 <h3>HBO MAX</h3>
-                <p>Recupera acceso único de HBO Max</p>
             </div>
             <div class="card-icono icono-max">
                 <svg viewBox="0 0 24 24">
