@@ -355,8 +355,8 @@ async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_i
                 try:
                     # 1. Ingresar al portal de Kingg
                     await page.goto("https://clientes.kingg.app/portal/login", timeout=45000)
-                    await page.get_by_placeholder("Tu usuario").fill("USUARIO_KING")
-                    await page.get_by_placeholder("Tu contraseña").fill("CLAVE_KING")
+                    await page.get_by_placeholder("Tu usuario").fill(os.getenv("USUARIO_KING"))
+                    await page.get_by_placeholder("Tu contraseña").fill(os.getenv("CLAVE_KING"))
                     await page.get_by_text("Ingresar a mis servicios").click()
             
                     await page.wait_for_timeout(3000)
