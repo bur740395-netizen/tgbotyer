@@ -333,16 +333,23 @@ async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_i
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=False,
+            headless=True,
             args=[
-                "--start-maximized",
-                "--disable-dev-shm-usage"
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--no-zygote",
+                "--disable-extensions",
+                "--mute-audio",
+                "--js-flags=--max-old-space-size=128"
             ]
         )
         
         try:
             for intento in range(1, max_intentos + 1):
-                context = await browser.new_context(no_viewport=True)
+                context = await browser.new_context()
                 page = await context.new_page()
 
                 try:
