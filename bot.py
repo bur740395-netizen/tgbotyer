@@ -403,46 +403,29 @@ async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_i
                     await page.locator("text=Bots").first.click()
                     await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
 
-                    # 1. Seleccionar plataforma según la opción elegida (HBO Max o Prime Video)
+                   # 1. Seleccionar plataforma según la opción elegida (HBO Max o Prime Video)
                     await page.get_by_text("Seleccionar plataforma").click()
-                    await page.wait_for_timeout(800)
+                    await page.wait_for_timeout(1000)
 
                     if plataforma == "prime":
-                        # Flujo de tus capturas para Prime Video
-                        await page.get_by_text("Prime Video").first.click()
-                        await page.wait_for_timeout(1000)
-                        
-                        # En Prime Video la acción es "Código de acceso" (suele autoseleccionarse, pero lo aseguramos)
-                        opcion_accion = page.get_by_text("Primero selecciona una plataforma")
-                        if await opcion_accion.is_visible():
-                            await opcion_accion.click()
-                            await page.wait_for_timeout(500)
-                            await page.get_by_text("Código de acceso").last.click()
-                        else:
-                            # Si ya dice "Código de acceso", hacemos clic para confirmar si el menú lo requiere
-                            await page.get_by_text("Código de acceso").first.click()
-                            await page.wait_for_timeout(500)
-                            if await page.get_by_text("Código de acceso").count() > 1:
-                                await page.get_by_text("Código de acceso").last.click()
+                        # Usamos .last para asegurarnos de tocar la opción del menú desplegable recién abierto
+                        await page.get_by_text("Prime Video", exact=True).last.click()
+                        await page.wait_for_timeout(800)
+                        await page.get_by_text("Código de acceso").last.click()
                     else:
-                        # Flujo original intacto para HBO Max
-                        await page.get_by_text("Max Estandar").first.click()
+                        # Flujo original de HBO Max
+                        await page.get_by_text("Max Estandar").last.click()
+                        await page.wait_for_timeout(800)
                         await page.get_by_text("MAX", exact=True).first.click()
 
-                    await page.wait_for_timeout(800)
+                    await page.wait_for_timeout(1000)
 
-                    # 2. Escribir el correo en la casilla "Escribe el correo de tu cuenta"
-                    input_correo = page.get_by_placeholder("Escribe el correo de tu cuenta")
-                    if await input_correo.is_visible():
-                        await input_correo.fill(correo_cliente)
-                    else:
-                        await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
-                    
+                    # 2. Escribir el correo en la casilla (idéntico al de Max que ya funcionaba)
+                    await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
                     await page.wait_for_timeout(1500)
                     
                     # 3. Seleccionar el correo que se despliega abajo y dar clic en Consultar
                     await page.get_by_text(correo_cliente).last.click()
-                    await page.wait_for_timeout(500)
                     await page.get_by_role("button", name="Consultar").click()
 
                     # 4. Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar apenas salga el código
