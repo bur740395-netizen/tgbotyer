@@ -4,20 +4,12 @@ import asyncio
 import re
 import threading
 from flask import Flask, request, render_template_string
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
 from playwright.async_api import async_playwright
 
-# 1. TUS CREDENCIALES
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-
-# 2. BASE DE DATOS DE CLIENTES
-IDS_PERMITIDOS = {7076121810, 1648637276}
-
-# Candado global para evitar que 2 navegadores se abran al mismo segundo y saturen los 512 MB de RAM
+# Candado global para evitar conflictos de concurrencia
 navegador_lock = threading.Lock()
 
-# Servidor Flask para la web y los pings
+# Servidor Flask para la web local
 app_flask = Flask(__name__)
 
 # --- DISEÑO VISUAL DE LA PÁGINA WEB ---
@@ -42,7 +34,6 @@ html_template = """
             box-sizing: border-box;
         }
         
-        /* Estilos del banner de publicidad superior */
         .banner-promo {
             position: fixed;
             top: 0;
@@ -72,13 +63,11 @@ html_template = """
             cursor: pointer;
         }
 
-        /* Contenedor principal */
         .wrapper {
             width: 100%;
             max-width: 440px;
         }
 
-        /* Estilo de las 2 tarjetas (Prime Video y HBO Max) */
         .card-opcion {
             background: rgba(30, 35, 45, 0.92);
             border: 2px solid #2b3240;
@@ -109,17 +98,11 @@ html_template = """
         }
 
         .card-info h3 {
-            margin: 0 0 6px 0;
+            margin: 0;
             font-size: 20px;
             font-weight: 800;
             letter-spacing: 0.5px;
             color: #ffffff;
-        }
-
-        .card-info p {
-            margin: 0;
-            font-size: 14px;
-            color: #b0b8c4;
         }
 
         .card-icono {
@@ -153,7 +136,6 @@ html_template = """
             stroke-linejoin: round;
         }
 
-        /* Caja del formulario que aparece al seleccionar */
         .contenedor-form {
             background-color: #1e232d;
             border: 1px solid #2e3646;
@@ -218,14 +200,12 @@ html_template = """
             font-size: 17px;
         }
         
-        /* Estilos para la animación de carga */
         #cargando { display: none; margin-top: 20px; font-size: 15px; color: #cbd5e1; font-weight: bold; }
         .spinner { border: 4px solid rgba(255, 255, 255, 0.15); border-left-color: #29b6f6; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <!-- BANNER PUBLICITARIO LLAMATIVO CON ENLACE A WHATSAPP -->
     <div class="banner-promo">
         PROMOCIONES Y VENTAS:
         <a href="https://wa.me/51931877274" target="_blank">
@@ -234,7 +214,6 @@ html_template = """
     </div>
 
     <div class="wrapper">
-        <!-- OPCIÓN 1: PRIME VIDEO -->
         <div class="card-opcion" id="card-prime" onclick="seleccionarPlataforma('prime')">
             <div class="card-info">
                 <h3>PRIME VIDEO</h3>
@@ -248,7 +227,6 @@ html_template = """
             </div>
         </div>
 
-        <!-- OPCIÓN 2: HBO MAX -->
         <div class="card-opcion" id="card-max" onclick="seleccionarPlataforma('max')">
             <div class="card-info">
                 <h3>HBO MAX</h3>
@@ -262,7 +240,6 @@ html_template = """
             </div>
         </div>
 
-        <!-- FORMULARIO DESPLEGABLE -->
         <div class="contenedor-form" id="caja-formulario">
             <h2 id="titulo-form">Consultar Código</h2>
             <form method="POST" onsubmit="mostrarCarga()">
@@ -271,10 +248,9 @@ html_template = """
                 <button type="submit" id="btn-consultar">Consultar Código</button>
             </form>
             
-            <!-- Pantalla de carga (Oculta por defecto) -->
             <div id="cargando">
                 <div class="spinner"></div>
-                <p>⏳ Esperar aprox. 1 minuto, obteniendo código...</p>
+                <p>⏳ Navegador abierto, obteniendo código...</p>
             </div>
         </div>
 
@@ -321,7 +297,6 @@ html_template = """
             }
         }
 
-        // Mantener seleccionada la tarjeta tras enviar una consulta
         {% if plataforma_actual %}
             seleccionarPlataforma('{{ plataforma_actual }}');
         {% endif %}
@@ -330,7 +305,6 @@ html_template = """
 </html>
 """
 
-# --- RUTAS DE FLASK ---
 @app_flask.route('/', methods=['GET', 'POST'])
 def index():
     resultado = None
@@ -339,111 +313,89 @@ def index():
         correo = request.form.get('correo', '').strip()
         plataforma_actual = request.form.get('plataforma', 'max').strip().lower()
         try:
-            # El candado asegura que si hay otra consulta en curso, espere su turno sin duplicar la RAM
             with navegador_lock:
                 resultado = asyncio.run(extraer_codigo_web(correo, plataforma_actual))
         except Exception as e:
             resultado = f"Error al procesar: {e}"
         finally:
-            gc.collect()  # Limpiar memoria RAM inmediatamente
+            gc.collect()
             
     return render_template_string(html_template, resultado=resultado, plataforma_actual=plataforma_actual)
 
 @app_flask.route('/ping')
 def ping():
-    return "Bot activo y funcionando"
-
-def run_flask():
-    # threaded=True pero controlado por nuestro candado y sin recarga en modo debug
-    app_flask.run(host="0.0.0.0", port=10000, debug=False, use_reloader=False)
+    return "Servidor web activo y funcionando"
 
 
-# --- LÓGICA DE EXTRACCIÓN OPTIMIZADA (SOPORTA MAX Y PRIME VIDEO) ---
+# --- LÓGICA DE EXTRACCIÓN MEDIANTE TIPEOM Y CLIC DIRECTO ---
 async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_intentos: int = 3) -> str:
     nombre_plat = "Prime Video" if plataforma == "prime" else "HBO Max"
 
-    # Iniciamos Playwright UNA sola vez fuera del bucle de reintentos
     async with async_playwright() as p:
         browser = await p.chromium.launch(
-            headless=True,
+            headless=False,
             args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--no-zygote",
-                "--disable-extensions",
-                "--disable-background-networking",
-                "--disable-default-apps",
-                "--disable-sync",
-                "--mute-audio",
-                "--js-flags=--max-old-space-size=128"  # Limita la RAM de JavaScript en el navegador
+                "--start-maximized",
+                "--disable-dev-shm-usage"
             ]
         )
         
         try:
             for intento in range(1, max_intentos + 1):
-                context = await browser.new_context()
+                context = await browser.new_context(no_viewport=True)
                 page = await context.new_page()
 
-                # Bloquear recursos pesados (imágenes, fuentes, multimedia)
-                await page.route(
-                    "**/*", 
-                    lambda route: route.abort() if route.request.resource_type in ["image", "font", "media"] else route.continue_()
-                )
-
                 try:
+                    # 1. Ingresar al portal de Kingg
                     await page.goto("https://clientes.kingg.app/portal/login", timeout=45000)
-                    await page.get_by_placeholder("Tu usuario").fill("yersonmg29")
-                    await page.get_by_placeholder("Tu contraseña").fill("Yersonmg29cuentas*")
+                    await page.get_by_placeholder("Tu usuario").fill("USUARIO_KING")
+                    await page.get_by_placeholder("Tu contraseña").fill("CLAVE_KING")
                     await page.get_by_text("Ingresar a mis servicios").click()
             
                     await page.wait_for_timeout(3000)
                     await page.locator("text=Bots").first.click()
                     await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
 
-                   # 1. Clic en Seleccionar plataforma
+                    # 2. Clic en Seleccionar plataforma para abrir el menú desplegable
                     await page.get_by_text("Seleccionar plataforma").click()
-                    await page.wait_for_timeout(1500)
+                    await page.wait_for_timeout(1000)
 
+                    # 3. Seleccionar usando las flechas del teclado y Enter
                     if plataforma == "prime":
-                        # Elegir Prime Video del menú
-                        await page.get_by_text("Prime Video").last.click()
+                        # Dos veces flecha abajo y Enter para elegir Prime Video
+                        await page.keyboard.press("ArrowDown")
+                        await page.wait_for_timeout(400)
+                        await page.keyboard.press("ArrowDown")
+                        await page.wait_for_timeout(400)
+                        await page.keyboard.press("Enter")
                         await page.wait_for_timeout(1500)
-                        
-                        # Si en Acción aún dice "Primero selecciona...", abrimos y elegimos "Código de acceso"
-                        # (Si ya se puso solo "Código de acceso" como en tu foto, no hace falta abrirlo)
-                        if await page.get_by_text("Primero selecciona una plataforma").is_visible():
-                            await page.get_by_text("Primero selecciona una plataforma").click()
-                            await page.wait_for_timeout(1000)
-                            await page.get_by_text("Código de acceso").last.click()
-                            await page.wait_for_timeout(1000)
                     else:
-                        # Flujo original de HBO Max
-                        await page.get_by_text("Max Estandar").first.click()
+                        # Una vez flecha abajo y Enter para elegir Max Estandar
+                        await page.keyboard.press("ArrowDown")
+                        await page.wait_for_timeout(400)
+                        await page.keyboard.press("Enter")
                         await page.wait_for_timeout(1000)
+                        # Seleccionar acción MAX
                         await page.get_by_text("MAX", exact=True).first.click()
                         await page.wait_for_timeout(1000)
-
-                    # 2. Escribir el correo DIRECTAMENTE en la caja "Escribe el correo de tu cuenta"
+                                        
+                    # 4. Escribir correo en la caja correcta
                     caja_correo = page.get_by_placeholder("Escribe el correo de tu cuenta")
                     await caja_correo.click()
                     await caja_correo.fill(correo_cliente)
                     
-                    # 3. Esperar 2.5 segundos a que cargue la tarjetita de abajo con el correo y darle clic
+                    # 5. Esperar y hacer clic en la tarjeta del correo desplegado abajo
                     await page.wait_for_timeout(2500)
-                    await page.get_by_text(correo_cliente).last.click()
+                    await page.get_by_text(correo_cliente).last.click(force=True)
                     
-                    # 4. Esperar 2.5 segundos a que se ponga azul el botón Consultar y darle clic
+                    # 6. Esperar y dar clic en Consultar
                     await page.wait_for_timeout(2500)
-                    await page.get_by_role("button", name="Consultar").click()
+                    await page.get_by_role("button", name="Consultar").click(force=True)
 
-                    # 4. Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar apenas salga el código
+                    # 7. Espera inteligente para extraer el código
                     await page.wait_for_timeout(4000)
                     for _ in range(8):
                         texto_pantalla = await page.locator("body").inner_text()
-                        # Recortamos a partir de "MÁS RECIENTE" o "CÓDIGO DE ACCESO" si aparece para mayor precisión
                         zona_busqueda = texto_pantalla
                         if "MÁS RECIENTE" in texto_pantalla:
                             zona_busqueda = texto_pantalla.split("MÁS RECIENTE")[-1]
@@ -466,59 +418,11 @@ async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_i
                     return f"❌ Error tras {max_intentos} intentos: {error}"
                 
                 finally:
-                    # Cerramos la pestaña y el contexto tras cada intento para no acumular RAM
                     await page.close()
                     await context.close()
         finally:
-            # Cerramos el navegador por completo y liberamos la memoria
             await browser.close()
             gc.collect()
 
-
-# --- LÓGICA DE TELEGRAM ---
-async def procesar_comando_telegram(update: Update, context: ContextTypes.DEFAULT_TYPE, plataforma: str):
-    user_id = update.effective_user.id
-    nombre_plat = "Prime Video" if plataforma == "prime" else "HBO Max"
-    cmd_ejemplo = "/prime" if plataforma == "prime" else "/max"
-    
-    if user_id not in IDS_PERMITIDOS:
-        await update.message.reply_text("⛔ Acceso denegado. Tu ID no está registrado.")
-        return
-
-    try:
-        correo = context.args[0].strip()
-        await update.message.reply_text(f"🔍 Consultando código de {nombre_plat} para:\n{correo}\nPor favor, espera unos segundos...")
-        
-        loop = asyncio.get_running_loop()
-        def tarea_sincronizada():
-            with navegador_lock:
-                return asyncio.run(extraer_codigo_web(correo, plataforma))
-                
-        resultado = await loop.run_in_executor(None, tarea_sincronizada)
-        await update.message.reply_text(resultado)
-        
-    except IndexError:
-        await update.message.reply_text(f"⚠️ Formato incorrecto. Por favor envía:\n{cmd_ejemplo} correo@cuenta.com")
-    finally:
-        gc.collect()
-
-async def comando_max(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await procesar_comando_telegram(update, context, "max")
-
-async def comando_prime(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await procesar_comando_telegram(update, context, "prime")
-
-def main():
-    # Iniciar Flask en segundo plano
-    hilo_flask = threading.Thread(target=run_flask, daemon=True)
-    hilo_flask.start()
-
-    # Iniciar bot de Telegram
-    app = Application.builder().token(TOKEN).connect_timeout(30).read_timeout(30).build()
-    app.add_handler(CommandHandler("max", comando_max))
-    app.add_handler(CommandHandler("prime", comando_prime))
-    print("🤖 Bot (Max + Prime) y servidor web Flask en línea. Esperando consultas...")
-    app.run_polling()
-
 if __name__ == "__main__":
-    main()
+    app_flask.run(host="0.0.0.0", port=10000, debug=False)
