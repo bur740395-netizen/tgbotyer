@@ -403,29 +403,40 @@ async def extraer_codigo_web(correo_cliente: str, plataforma: str = "max", max_i
                     await page.locator("text=Bots").first.click()
                     await page.wait_for_selector("text=Buscar código o enlace", timeout=10000)
 
-                   # 1. Seleccionar plataforma según la opción elegida (HBO Max o Prime Video)
+                   # 1. Clic en Seleccionar plataforma
                     await page.get_by_text("Seleccionar plataforma").click()
-                    await page.wait_for_timeout(1000)
+                    await page.wait_for_timeout(1500)
 
                     if plataforma == "prime":
-                        # Usamos .last para asegurarnos de tocar la opción del menú desplegable recién abierto
-                        await page.get_by_text("Prime Video", exact=True).last.click()
-                        await page.wait_for_timeout(800)
-                        await page.get_by_text("Código de acceso").last.click()
+                        # Elegir Prime Video del menú
+                        await page.get_by_text("Prime Video").last.click()
+                        await page.wait_for_timeout(1500)
+                        
+                        # Si en Acción aún dice "Primero selecciona...", abrimos y elegimos "Código de acceso"
+                        # (Si ya se puso solo "Código de acceso" como en tu foto, no hace falta abrirlo)
+                        if await page.get_by_text("Primero selecciona una plataforma").is_visible():
+                            await page.get_by_text("Primero selecciona una plataforma").click()
+                            await page.wait_for_timeout(1000)
+                            await page.get_by_text("Código de acceso").last.click()
+                            await page.wait_for_timeout(1000)
                     else:
                         # Flujo original de HBO Max
-                        await page.get_by_text("Max Estandar").last.click()
-                        await page.wait_for_timeout(800)
+                        await page.get_by_text("Max Estandar").first.click()
+                        await page.wait_for_timeout(1000)
                         await page.get_by_text("MAX", exact=True).first.click()
+                        await page.wait_for_timeout(1000)
 
-                    await page.wait_for_timeout(1000)
-
-                    # 2. Escribir el correo en la casilla (idéntico al de Max que ya funcionaba)
-                    await page.locator("input[type='text'], input[type='email']").last.fill(correo_cliente)
-                    await page.wait_for_timeout(1500)
+                    # 2. Escribir el correo DIRECTAMENTE en la caja "Escribe el correo de tu cuenta"
+                    caja_correo = page.get_by_placeholder("Escribe el correo de tu cuenta")
+                    await caja_correo.click()
+                    await caja_correo.fill(correo_cliente)
                     
-                    # 3. Seleccionar el correo que se despliega abajo y dar clic en Consultar
+                    # 3. Esperar 2.5 segundos a que cargue la tarjetita de abajo con el correo y darle clic
+                    await page.wait_for_timeout(2500)
                     await page.get_by_text(correo_cliente).last.click()
+                    
+                    # 4. Esperar 2.5 segundos a que se ponga azul el botón Consultar y darle clic
+                    await page.wait_for_timeout(2500)
                     await page.get_by_role("button", name="Consultar").click()
 
                     # 4. Espera inteligente: revisa cada 2 segundos (hasta 20s) para cerrar apenas salga el código
